@@ -173,7 +173,7 @@ ggplot(s5, aes(y = mean, x = blockNr, group = difficulty, colour = difficulty)) 
   labs(y = 'VSR (%)', x = 'Block number', colour = 'Difficulty of switch')
 
 # VSR by diff and block
-s6 <- s3 %>% # reshape and summarise for plot 2
+s6 <- s3 %>% # reshape and summarise for plot 3
   pivot_longer(cols = c('vsr_easy', 'vsr_diff'), names_prefix = 'vsr_', names_to = 'difficulty', # reshape (to long format)
                values_to = 'vsr_difficulty') %>% 
   group_by(blockNr, difficulty) %>% 
