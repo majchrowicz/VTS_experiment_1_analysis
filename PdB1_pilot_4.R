@@ -41,7 +41,7 @@ p1 <- na_if(p0, "") %>% # replace blank spaces with NAs
            'both_loc_cb1.keys', 'both_loc_cb1.rt', 'both_loc_cb1.corr', 
            'both_shape_cb2.keys', 'both_shape_cb2.rt', 'both_shape_cb2.corr', 
            'both_loc_cb2.keys', 'both_loc_cb2.rt', 'both_loc_cb2.corr')) %>% 
-  mutate(id = replace(id, id == 70842, 108),
+  mutate(id = replace(id, id == 70842, 108), # replace id's
          id = replace(id, id == 133966, 111))
 
 table(p1$id) # check ids
