@@ -155,6 +155,9 @@ ggplot(s4, aes(y = mean, x = difficulty)) + # plot VSR by difficulty
   scale_x_discrete(limits = rev, labels = c('Easy', 'Difficult')) +
   labs(y = 'VSR (%)', x = 'Difficulty of switch')
 
+ggsave('vsrDiff.png', path = 'plots/')
+
+
 # VSR by id, diff and block
 s5 <- s3 %>% # reshape and summarise for plot 2
   pivot_longer(cols = c('vsr_easy', 'vsr_diff'), names_prefix = 'vsr_', names_to = 'difficulty', # reshape (to long format)
@@ -205,7 +208,9 @@ ggplot(z1, aes(y = n, x = switch_type, fill = switch_type, colour = switch_type)
   facet_wrap(~id) +
   geom_text(aes(label = n), nudge_y = 30) +
   theme(axis.text.x = element_text(angle = 60, vjust = 0.5))
-  
+
+ggsave('switchTypexId.png', path = 'plots/')
+
   
 # Easy vs difficult decision (% of easy task selection)
 
@@ -238,10 +243,13 @@ p7 %>% # plot by block only
   mutate(easy_sel = loc/(loc+shape)) %>% 
   ggplot(., aes(x = blockNr, y = easy_sel)) +
   geom_point(size = 2) +
+  scale_y_continuous(limits = c(0,1)) +
   labs(y = 'Selection of easy task (%)', x = 'Block')
 
-# Accuracy ##########
+ggsave('easySelxBlock.png', path = 'plots/')
 
+
+# Accuracy ##########
 
 p7 %>% # averaged across ids
   group_by(id, switch_type) %>% 
@@ -259,6 +267,8 @@ p7 %>% # averaged across ids
   geom_point(size = 5, position = position_dodge(0.1)) +
   geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1, position = position_dodge(0.1)) +
   labs(y = 'Accuracy (%)', x = 'Trial type') 
+
+ggsave('accuracy.png', path = 'plots/')
 
 p7 %>% # per id
   group_by(id, switch_type) %>% 
@@ -288,6 +298,8 @@ p7 %>%
   geom_point(size = 5, position = position_dodge(0.1)) +
   geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1, position = position_dodge(0.1)) +
   labs(y = 'RT', x = 'Trial type') 
+
+ggsave('rt.png', path = 'plots/')
 
 
 # Checks ###########
