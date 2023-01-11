@@ -209,7 +209,7 @@ ggplot(z1, aes(y = n, x = switch_type, fill = switch_type, colour = switch_type)
   geom_text(aes(label = n), nudge_y = 30) +
   theme(axis.text.x = element_text(angle = 60, vjust = 0.5))
 
-ggsave('switchTypexId.png', path = 'plots/')
+ggsave('switchTypexId.png', path = 'plots/', width = 12, height = 11)
 
   
 # Easy vs difficult decision (% of easy task selection)
@@ -248,6 +248,23 @@ p7 %>% # plot by block only
 
 ggsave('easySelxBlock.png', path = 'plots/')
 
+# Switch vs stay (% of switches)
+
+p7 %>% # overall proportion of switches
+  filter(!is.na(switch)) %>% 
+  group_by(switch) %>%
+  count() %>% 
+  pivot_wider(names_from = 'switch', values_from = 'n') %>% 
+  rename(stay = 1, switch = 2) %>% 
+  mutate(switch_prop = switch/(switch+stay))
+
+p7 %>% # overall proportion of switch types
+  filter(switch_type != 'unknownSwitch') %>% 
+  group_by(switch_type) %>%
+  count() %>% 
+  pivot_wider(names_from = 'switch_type', values_from = 'n') %>% 
+  mutate(switch_diff_prop = switch_shape/(stay_loc+stay_shape+switch_loc+switch_shape),
+         switch_easy_prop =   switch_loc/(stay_loc+stay_shape+switch_loc+switch_shape))
 
 # Accuracy ##########
 
