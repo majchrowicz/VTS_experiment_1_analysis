@@ -331,7 +331,7 @@ p7 %>% # plot switch type, averaged across ids
   geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1, position = position_dodge(0.1)) +
   geom_text(aes(label = round(mean,3)), nudge_y = 0.003, nudge_x = 0.3) +
   theme(axis.text.x = element_text(angle = 30, vjust = 0.6)) +
-  labs(y = 'Accuracy (%)', x = 'Trial type') 
+  labs(y = 'Accuracy (%)', x = 'Trial type')
 
 ggsave('accuracy.png', path = 'plots_pilot_3/')
 
@@ -352,6 +352,7 @@ p7 %>% # plot switch type, per id
   geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1, position = position_dodge(0.1)) +
   labs(y = 'Accuracy (%)', x = 'Trial type') +
   facet_wrap(~id)
+
 
 # RTs ############
 
