@@ -40,9 +40,7 @@ p1 <- na_if(p0, "") %>% # replace blank spaces with NAs
            'both_shape_cb1.keys', 'both_shape_cb1.rt', 'both_shape_cb1.corr', 
            'both_loc_cb1.keys', 'both_loc_cb1.rt', 'both_loc_cb1.corr', 
            'both_shape_cb2.keys', 'both_shape_cb2.rt', 'both_shape_cb2.corr', 
-           'both_loc_cb2.keys', 'both_loc_cb2.rt', 'both_loc_cb2.corr')) %>% 
-  mutate(id = replace(id, id == 70842, 108), # replace id's
-         id = replace(id, id == 133966, 111))
+           'both_loc_cb2.keys', 'both_loc_cb2.rt', 'both_loc_cb2.corr')) 
 
 table(p1$id) # check ids
   
@@ -151,11 +149,10 @@ s4 <- s3 %>% # reshape and summarise for plot 1
 ggplot(s4, aes(y = mean, x = difficulty)) + # plot VSR by difficulty
   geom_point(size = 5) +
   geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1) +
-  # scale_y_continuous(limits = c(0,1)) +
   scale_x_discrete(limits = rev, labels = c('Easy', 'Difficult')) +
   labs(y = 'VSR (%)', x = 'Difficulty of switch')
 
-ggsave('vsrDiff.png', path = 'plots/')
+ggsave('vsrDiff.png', path = 'plots_pilot_3/')
 
 
 # VSR by id, diff and block
@@ -191,11 +188,14 @@ ggplot(s6, aes(y = mean, x = blockNr, group = difficulty, colour = difficulty)) 
   # scale_y_continuous(limits = c(0,1)) +
   scale_colour_discrete(limits = rev, labels = c('Easy', 'Difficult')) +
   labs(y = 'VSR (%)', x = 'Block number', colour = 'Difficulty of switch')
+
+ggsave('vsrDiffxBlock.png', path = 'plots_pilot_3/')
+
  
 
-# Stay vs switch by id
+# Switch vs stay (% of switches) ##########
 
-z1 <- p7 %>% 
+z1 <- p7 %>% # number of switch types
   filter(!is.na(switch)) %>% 
   group_by(id) %>% 
   count(switch_type) %>% 
@@ -203,16 +203,52 @@ z1 <- p7 %>%
   mutate_at(2:5, ~replace_na(.,0)) %>% 
   pivot_longer(cols = c(2:5), names_to = 'switch_type', values_to = 'n')
 
-ggplot(z1, aes(y = n, x = switch_type, fill = switch_type, colour = switch_type)) +
+ggplot(z1, aes(y = n, x = switch_type, fill = switch_type, colour = switch_type)) + # switch types by id
   geom_point(size= 2) +
   facet_wrap(~id) +
   geom_text(aes(label = n), nudge_y = 30) +
   theme(axis.text.x = element_text(angle = 60, vjust = 0.5))
 
-ggsave('switchTypexId.png', path = 'plots/', width = 12, height = 11)
+ggsave('switchTypexId.png', path = 'plots_pilot_3/', width = 12, height = 11)
+
+p7 %>% # overall proportion of switches
+  filter(!is.na(switch)) %>% 
+  group_by(switch) %>%
+  count() %>% 
+  pivot_wider(names_from = 'switch', values_from = 'n') %>% 
+  rename(stay = 1, switch = 2) %>% 
+  mutate(switch_prop = switch/(switch+stay),
+         stay_prop   = stay  /(switch+stay))
+
+p7 %>% # overall proportion of switch types
+  filter(switch_type != 'unknownSwitch') %>% 
+  group_by(switch_type) %>%
+  count() %>% 
+  pivot_wider(names_from = 'switch_type', values_from = 'n') %>% 
+  mutate(switch_diff_prop = switch_shape/(stay_loc+stay_shape+switch_loc+switch_shape),
+         switch_easy_prop =   switch_loc/(stay_loc+stay_shape+switch_loc+switch_shape))
+
+p7 %>% # plot proportion of switches per id
+  filter(!is.na(switch)) %>% 
+  group_by(switch, id) %>%
+  count() %>% 
+  pivot_wider(names_from = 'switch', values_from = 'n') %>% 
+  rename(stay = 2, switch = 3) %>% 
+  mutate(switch_prop = switch/(switch+stay),
+         stay_prop   = stay  /(switch+stay)) %>% 
+  pivot_longer(cols = c('switch_prop', 'stay_prop'), names_to = 'type', values_to = 'prop') %>% 
+  ggplot(., aes(y = prop, x = type)) +
+  geom_point(size = 2) +
+  facet_wrap(~id) +
+  geom_text(aes(label = round(prop,2)), nudge_y = 0.1) +
+  scale_x_discrete(labels=c('Stay', 'Switch')) +
+  labs(y = 'Proportion (%)', x = 'Type')
+  
+ggsave('switchPropxId.png', path = 'plots_pilot_3/', width = 9, height = 8)
+
 
   
-# Easy vs difficult decision (% of easy task selection)
+# Easy vs difficult decision (% of easy task selection) ##########
 
 p7 %>% # overall proportion of easy task selection
   filter(task != 'unknownTask') %>% 
@@ -243,34 +279,43 @@ p7 %>% # plot by block only
   mutate_if(is.numeric, ~replace_na(.,0)) %>%
   mutate(easy_sel = loc/(loc+shape)) %>% 
   ggplot(., aes(x = blockNr, y = easy_sel)) +
-  geom_point(size = 2) +
+  geom_point(size = 3) +
+  geom_text(aes(label = round(easy_sel,2)), nudge_y = 0.04) +
   scale_y_continuous(limits = c(0,1)) +
   labs(y = 'Selection of easy task (%)', x = 'Block')
 
-ggsave('easySelxBlock.png', path = 'plots/')
+ggsave('easySelxBlock.png', path = 'plots_pilot_3/')
 
-# Switch vs stay (% of switches)
-
-p7 %>% # overall proportion of switches
-  filter(!is.na(switch)) %>% 
-  group_by(switch) %>%
-  count() %>% 
-  pivot_wider(names_from = 'switch', values_from = 'n') %>% 
-  rename(stay = 1, switch = 2) %>% 
-  mutate(switch_prop = switch/(switch+stay),
-         stay_prop   = stay  /(switch+stay))
-
-p7 %>% # overall proportion of switch types
-  filter(switch_type != 'unknownSwitch') %>% 
-  group_by(switch_type) %>%
-  count() %>% 
-  pivot_wider(names_from = 'switch_type', values_from = 'n') %>% 
-  mutate(switch_diff_prop = switch_shape/(stay_loc+stay_shape+switch_loc+switch_shape),
-         switch_easy_prop =   switch_loc/(stay_loc+stay_shape+switch_loc+switch_shape))
 
 # Accuracy ##########
 
-p7 %>% # averaged across ids
+p7 %>% # stay vs switch
+  group_by(id, switch) %>% 
+  filter(!is.na(switch)) %>%
+  mutate(corr = as.integer(corr)) %>% 
+  summarise(sumCorr = sum(corr, na.rm = T)) %>% 
+  left_join(p7 %>% 
+              group_by(id, switch) %>% 
+              filter(!is.na(switch)) %>% 
+              count()) %>% 
+  mutate(acc = sumCorr/n) %>% 
+  group_by(switch) %>% 
+  get_summary_stats(acc)
+
+p7 %>% # easy vs difficult task
+  group_by(id, task) %>% 
+  filter(task != 'unknownTask') %>%
+  mutate(corr = as.integer(corr)) %>% 
+  summarise(sumCorr = sum(corr, na.rm = T)) %>% 
+  left_join(p7 %>% 
+              group_by(id, task) %>% 
+              filter(task != 'unknownTask') %>% 
+              count()) %>% 
+  mutate(acc = sumCorr/n) %>% 
+  group_by(task) %>% 
+  get_summary_stats(acc)
+
+p7 %>% # plot switch type, averaged across ids
   group_by(id, switch_type) %>% 
   filter(switch_type != 'unknownSwitch') %>%
   mutate(corr = as.integer(corr)) %>% 
@@ -285,11 +330,13 @@ p7 %>% # averaged across ids
   ggplot(., aes(y = mean, x = switch_type)) +
   geom_point(size = 5, position = position_dodge(0.1)) +
   geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1, position = position_dodge(0.1)) +
+  geom_text(aes(label = round(mean,3)), nudge_y = 0.003, nudge_x = 0.3) +
+  theme(axis.text.x = element_text(angle = 30, vjust = 0.6)) +
   labs(y = 'Accuracy (%)', x = 'Trial type') 
 
-ggsave('accuracy.png', path = 'plots/')
+ggsave('accuracy.png', path = 'plots_pilot_3/')
 
-p7 %>% # per id
+p7 %>% # plot switch type, per id
   group_by(id, switch_type) %>% 
   filter(switch_type != 'unknownSwitch') %>%
   mutate(corr = as.integer(corr)) %>% 
@@ -316,9 +363,11 @@ p7 %>%
   ggplot(., aes(y = mean, x = switch_type)) +
   geom_point(size = 5, position = position_dodge(0.1)) +
   geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1, position = position_dodge(0.1)) +
-  labs(y = 'RT', x = 'Trial type') 
+  geom_text(aes(label = round(mean,3)), nudge_y = 0.01, nudge_x = 0.3) +
+  theme(axis.text.x = element_text(angle = 30, vjust = 0.6)) +
+  labs(y = 'RT (s)', x = 'Trial type') 
 
-ggsave('rt.png', path = 'plots/')
+ggsave('rt.png', path = 'plots_pilot_3/')
 
 
 # Checks ###########
