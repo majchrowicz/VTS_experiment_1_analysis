@@ -246,7 +246,6 @@ p7 %>% # plot proportion of switches per id
   
 ggsave('switchPropxId.png', path = 'plots_pilot_3/', width = 9, height = 8)
 
-
   
 # Easy vs difficult decision (% of easy task selection) ##########
 
