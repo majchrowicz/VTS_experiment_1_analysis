@@ -40,9 +40,7 @@ p1 <- na_if(p0, "") %>% # replace blank spaces with NAs
            'both_shape_cb1.keys', 'both_shape_cb1.rt', 'both_shape_cb1.corr', 
            'both_loc_cb1.keys', 'both_loc_cb1.rt', 'both_loc_cb1.corr', 
            'both_shape_cb2.keys', 'both_shape_cb2.rt', 'both_shape_cb2.corr', 
-           'both_loc_cb2.keys', 'both_loc_cb2.rt', 'both_loc_cb2.corr')) %>% 
-  mutate(id = replace(id, id == 70842, 108), # replace id's
-         id = replace(id, id == 133966, 111))
+           'both_loc_cb2.keys', 'both_loc_cb2.rt', 'both_loc_cb2.corr')) 
 
 table(p1$id) # check ids
   
@@ -151,11 +149,10 @@ s4 <- s3 %>% # reshape and summarise for plot 1
 ggplot(s4, aes(y = mean, x = difficulty)) + # plot VSR by difficulty
   geom_point(size = 5) +
   geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1) +
-  # scale_y_continuous(limits = c(0,1)) +
   scale_x_discrete(limits = rev, labels = c('Easy', 'Difficult')) +
   labs(y = 'VSR (%)', x = 'Difficulty of switch')
 
-ggsave('vsrDiff.png', path = 'plots/')
+ggsave('vsrDiff.png', path = 'plots_pilot_3/')
 
 
 # VSR by id, diff and block
@@ -191,6 +188,9 @@ ggplot(s6, aes(y = mean, x = blockNr, group = difficulty, colour = difficulty)) 
   # scale_y_continuous(limits = c(0,1)) +
   scale_colour_discrete(limits = rev, labels = c('Easy', 'Difficult')) +
   labs(y = 'VSR (%)', x = 'Block number', colour = 'Difficulty of switch')
+
+ggsave('vsrDiffxBlock.png', path = 'plots_pilot_3/')
+
  
 
 # Stay vs switch by id
@@ -209,7 +209,7 @@ ggplot(z1, aes(y = n, x = switch_type, fill = switch_type, colour = switch_type)
   geom_text(aes(label = n), nudge_y = 30) +
   theme(axis.text.x = element_text(angle = 60, vjust = 0.5))
 
-ggsave('switchTypexId.png', path = 'plots/', width = 12, height = 11)
+ggsave('switchTypexId.png', path = 'plots_pilot_3/', width = 12, height = 11)
 
   
 # Easy vs difficult decision (% of easy task selection)
@@ -247,7 +247,7 @@ p7 %>% # plot by block only
   scale_y_continuous(limits = c(0,1)) +
   labs(y = 'Selection of easy task (%)', x = 'Block')
 
-ggsave('easySelxBlock.png', path = 'plots/')
+ggsave('easySelxBlock.png', path = 'plots_pilot_3/')
 
 # Switch vs stay (% of switches)
 
@@ -287,7 +287,7 @@ p7 %>% # averaged across ids
   geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1, position = position_dodge(0.1)) +
   labs(y = 'Accuracy (%)', x = 'Trial type') 
 
-ggsave('accuracy.png', path = 'plots/')
+ggsave('accuracy.png', path = 'plots_pilot_3/')
 
 p7 %>% # per id
   group_by(id, switch_type) %>% 
@@ -318,7 +318,7 @@ p7 %>%
   geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1, position = position_dodge(0.1)) +
   labs(y = 'RT', x = 'Trial type') 
 
-ggsave('rt.png', path = 'plots/')
+ggsave('rt.png', path = 'plots_pilot_3/')
 
 
 # Checks ###########
