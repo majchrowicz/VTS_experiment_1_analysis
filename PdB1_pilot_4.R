@@ -20,43 +20,100 @@
 }
 
 # Load and transform data ###########
-p0a <- read_bulk(directory = "C:/Users/barto/Psych/Badania/PdB Exp1/PilotVTS/Exp analysis pilot/data_pilot_3",
-                subdirectories = F, verbose = F, fun = read.csv) %>% as_tibble() # load multiple data files 
+p0 <- read_bulk(directory = "C:/Users/barto/Psych/Badania/PdB Exp1/PilotVTS/ForcedC/Cb1-4",
+                subdirectories = F, verbose = F, fun = read.csv) %>%# load multiple data files 
+  as_tibble() %>% 
+  select(File, everything()) %>% 
+  separate(File, into = c('x', 'id', 'z'), sep = c(2,3)) %>% 
+  select(-c(x,z)) %>% mutate(id = as.integer(id)) 
 
-p1a <- na_if(p0a, "") %>% # replace blank spaces with NAs
-  rename(id = participant) %>% 
+colnames(p0)
+
+p1 <- na_if(p0, "") %>% # replace blank spaces with NAs
+  # rename(id = participant) %>% 
   mutate(countBal = case_when(id %% 4 == 1 ~ 1,  # code counterbalance
                               id %% 4 == 2 ~ 2,
                               id %% 4 == 3 ~ 3,
                               id %% 4 == 0 ~ 4,
                               TRUE ~ NA_real_)) %>% 
-  rename(type = Type, stimuli = Stimuli, location = Location, shape = Shape) %>% 
+  rename(type = Type, stimuli = Stimuli, location = Location, shape = Shape, task = Task, cue = Cue, block = Block) %>% 
   mutate(type = tolower(type)) %>% 
-  select(c('id','countBal', 'frameRate', 'type':'correct_shape_right',  # select only needed columns, others are removed
-           'LoopCb1.thisRepN':'LoopCb1.thisIndex',
-           'nMainCb1.thisRepN':'nMainCb1.thisIndex',
-           'LoopCb2.thisRepN':'LoopCb2.thisIndex',
-           'nMainCb2.thisRepN':'nMainCb2.thisIndex',
-           'both_shape_cb1.keys', 'both_shape_cb1.rt', 'both_shape_cb1.corr', 
-           'both_loc_cb1.keys', 'both_loc_cb1.rt', 'both_loc_cb1.corr', 
-           'both_shape_cb2.keys', 'both_shape_cb2.rt', 'both_shape_cb2.corr', 
-           'both_loc_cb2.keys', 'both_loc_cb2.rt', 'both_loc_cb2.corr')) 
+  select(c('id','countBal', 'frameRate',   # select only needed columns, others are removed
+           'type':'shape', 'task':'block',
+           'correct_loc_left':'correct_shape_right',
+           
+           'nBlocksMixCb1.thisRepN':'nBlocksMixCb1.thisIndex',
+           'nTrialsMixCb1.thisRepN':'nTrialsMixCb1.thisIndex',
+           'nBlocksMixCb2.thisRepN':'nBlocksMixCb2.thisIndex',
+           'nTrialsMixCb2.thisRepN':'nTrialsMixCb2.thisIndex',
+           'nBlocksMixCb3.thisRepN':'nBlocksMixCb3.thisIndex',
+           'nTrialsMixCb3.thisRepN':'nTrialsMixCb3.thisIndex',
+           'nBlocksMixCb4.thisRepN':'nBlocksMixCb4.thisIndex',
+           'nTrialsMixCb4.thisRepN':'nTrialsMixCb4.thisIndex',
+           
+           'nBlocksFreeCb1.thisRepN':'nBlocksFreeCb1.thisIndex',
+           'nTrialsFreeCb1.thisRepN':'nTrialsFreeCb1.thisIndex',
+           'nBlocksFreeCb2.thisRepN':'nBlocksFreeCb2.thisIndex',
+           'nTrialsFreeCb2.thisRepN':'nTrialsFreeCb2.thisIndex',
+           'nBlocksFreeCb3.thisRepN':'nBlocksFreeCb3.thisIndex',
+           'nTrialsFreeCb3.thisRepN':'nTrialsFreeCb3.thisIndex',
+           'nBlocksFreeCb4.thisRepN':'nBlocksFreeCb4.thisIndex',
+           'nTrialsFreeCb4.thisRepN':'nTrialsFreeCb4.thisIndex',
 
+           'both_shape_cb1_mix.keys', 'both_shape_cb1_mix.rt', 'both_shape_cb1_mix.corr', 
+           'both_loc_cb1_mix.keys',   'both_loc_cb1_mix.rt',   'both_loc_cb1_mix.corr', 
+           'both_shape_cb1_free.keys', 'both_shape_cb1_free.rt', 'both_shape_cb1_free.corr', 
+           'both_loc_cb1_free.keys',   'both_loc_cb1_free.rt',   'both_loc_cb1_free.corr', 
+           
+           'both_shape_cb2_mix.keys', 'both_shape_cb2_mix.rt', 'both_shape_cb2_mix.corr', 
+           'both_loc_cb2_mix.keys',   'both_loc_cb2_mix.rt',   'both_loc_cb2_mix.corr', 
+           'both_shape_cb2_free.keys', 'both_shape_cb2_free.rt', 'both_shape_cb2_free.corr', 
+           'both_loc_cb2_free.keys',   'both_loc_cb2_free.rt',   'both_loc_cb2_free.corr', 
+           
+           'both_shape_cb3_mix.keys', 'both_shape_cb3_mix.rt', 'both_shape_cb3_mix.corr', 
+           'both_loc_cb3_mix.keys',   'both_loc_cb3_mix.rt',   'both_loc_cb3_mix.corr', 
+           'both_shape_cb3_free.keys', 'both_shape_cb3_free.rt', 'both_shape_cb3_free.corr', 
+           'both_loc_cb3_free.keys',   'both_loc_cb3_free.rt',   'both_loc_cb3_free.corr', 
+           
+           'both_shape_cb4_mix.keys', 'both_shape_cb4_mix.rt', 'both_shape_cb4_mix.corr', 
+           'both_loc_cb4_mix.keys',   'both_loc_cb4_mix.rt',   'both_loc_cb4_mix.corr', 
+           'both_shape_cb4_free.keys', 'both_shape_cb4_free.rt', 'both_shape_cb4_free.corr', 
+           'both_loc_cb4_free.keys',   'both_loc_cb4_free.rt',   'both_loc_cb4_free.corr', 
+  )) 
+
+colnames(p1)
 table(p1$id) # check ids
   
 p1s <- p1 %>% # remove practice trials
-  filter_at(vars('LoopCb1.thisRepN', 'LoopCb1.thisTrialN', 'LoopCb1.thisN', 'LoopCb1.thisIndex',
-                 'LoopCb2.thisRepN', 'LoopCb2.thisTrialN', 'LoopCb2.thisN', 'LoopCb2.thisIndex',
-                 'both_shape_cb1.corr', 'both_loc_cb1.corr', 'both_shape_cb2.corr', 'both_loc_cb2.corr'),
-            any_vars(!is.na(.)))
+  filter_at(vars(
+    # 'nBlocksMixCb1.thisRepN', 'nBlocksMixCb1.thisTrialN', 'nBlocksMixCb1.thisN', 'nBlocksMixCb1.thisIndex',
+    # 'nBlocksMixCb2.thisRepN', 'nBlocksMixCb2.thisTrialN', 'nBlocksMixCb2.thisN', 'nBlocksMixCb2.thisIndex',
+    # 'nBlocksMixCb3.thisRepN', 'nBlocksMixCb3.thisTrialN', 'nBlocksMixCb3.thisN', 'nBlocksMixCb3.thisIndex',
+    # 'nBlocksMixCb4.thisRepN', 'nBlocksMixCb4.thisTrialN', 'nBlocksMixCb4.thisN', 'nBlocksMixCb4.thisIndex',
+    
+    # 'nBlocksFreeCb1.thisRepN', 'nBlocksFreeCb1.thisTrialN', 'nBlocksFreeCb1.thisN', 'nBlocksFreeCb1.thisIndex',
+    # 'nBlocksFreeCb2.thisRepN', 'nBlocksFreeCb2.thisTrialN', 'nBlocksFreeCb2.thisN', 'nBlocksFreeCb2.thisIndex',
+    # 'nBlocksFreeCb3.thisRepN', 'nBlocksFreeCb3.thisTrialN', 'nBlocksFreeCb3.thisN', 'nBlocksFreeCb3.thisIndex',
+    # 'nBlocksFreeCb4.thisRepN', 'nBlocksFreeCb4.thisTrialN', 'nBlocksFreeCb4.thisN', 'nBlocksFreeCb4.thisIndex',
+    
+    'both_shape_cb1_mix.corr', 'both_loc_cb1_mix.corr', 'both_shape_cb2_mix.corr', 'both_loc_cb2_mix.corr',
+    'both_shape_cb3_mix.corr', 'both_loc_cb3_mix.corr', 'both_shape_cb4_mix.corr', 'both_loc_cb4_mix.corr',
+    
+    'both_shape_cb1_free.corr', 'both_loc_cb1_free.corr', 'both_shape_cb2_free.corr', 'both_loc_cb2_free.corr',
+    'both_shape_cb3_free.corr', 'both_loc_cb3_free.corr', 'both_shape_cb4_free.corr', 'both_loc_cb4_free.corr',
+  ),
+  any_vars(!is.na(.))) # remove rows with NA in previously specified columns
 
 
-p2 <- p1s %>% # fill in block number data based on values from specified columns
-  group_by(id) %>% 
-  fill(c('LoopCb1.thisRepN', 'LoopCb2.thisRepN'), .direction = "up") 
+p1s %>% 
+  group_by(id) %>% count()
 
-p3 <- p2 %>%  # remove rows with no data in specified columns
-  filter_at(vars('type','stimuli','location', 'shape'), all_vars(!is.na(.)))
+# p2 <- p1s %>% # fill in block number data based on values from specified columns
+#   group_by(id) %>% 
+#   fill(c('LoopCb1.thisRepN', 'LoopCb2.thisRepN'), .direction = "up") 
+
+# p3 <- p1s %>%  # remove rows with no data in specified columns
+#   filter_at(vars('type','stimuli','location', 'shape'), all_vars(!is.na(.)))
   
 
 p4 <- p3 %>%  # code/collapse block number (so that it's coded in a single column, not split to separate columns based on cb)
