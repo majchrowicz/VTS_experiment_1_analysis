@@ -20,10 +20,10 @@
 }
 
 # Load and transform data ###########
-p0 <- read_bulk(directory = "C:/Users/barto/Psych/Badania/PdB Exp1/PilotVTS/Exp analysis pilot/data_pilot_3",
+p0a <- read_bulk(directory = "C:/Users/barto/Psych/Badania/PdB Exp1/PilotVTS/Exp analysis pilot/data_pilot_3",
                 subdirectories = F, verbose = F, fun = read.csv) %>% as_tibble() # load multiple data files 
 
-p1 <- na_if(p0, "") %>% # replace blank spaces with NAs
+p1a <- na_if(p0a, "") %>% # replace blank spaces with NAs
   rename(id = participant) %>% 
   mutate(countBal = case_when(id %% 4 == 1 ~ 1,  # code counterbalance
                               id %% 4 == 2 ~ 2,

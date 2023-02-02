@@ -19,28 +19,27 @@
               theme(panel.grid.minor = element_blank()))
 }
 
-# Load and transform data ###########
+# Data wrangling ###########
 p0 <- read_bulk(directory = "C:/Users/barto/Psych/Badania/PdB Exp1/PilotVTS/ForcedC/Cb1-4",
-                subdirectories = F, verbose = F, fun = read.csv) %>%# load multiple data files 
-  as_tibble() %>% 
+                subdirectories = F, verbose = F, fun = read.csv) %>% # load data from multiple files 
+  as_tibble() %>%
   select(File, everything()) %>% 
   separate(File, into = c('x', 'id', 'z'), sep = c(2,3)) %>% 
   select(-c(x,z)) %>% mutate(id = as.integer(id)) 
 
-colnames(p0)
-
-p1 <- na_if(p0, "") %>% # replace blank spaces with NAs
+p1 <- p0 %>% 
+  mutate_if(is.character, list(~na_if(.,""))) %>%  # replace blank spaces with NAs
   # rename(id = participant) %>% 
   mutate(countBal = case_when(id %% 4 == 1 ~ 1,  # code counterbalance
                               id %% 4 == 2 ~ 2,
                               id %% 4 == 3 ~ 3,
                               id %% 4 == 0 ~ 4,
                               TRUE ~ NA_real_)) %>% 
-  rename(type = Type, stimuli = Stimuli, location = Location, shape = Shape, task = Task, cue = Cue, block = Block) %>% 
+  rename(type = Type, stimuli = Stimuli, location = Location, shape = Shape, task = Task, cue = Cue, block = Block, cuefol = cue_follow) %>% 
   mutate(type = tolower(type)) %>% 
   select(c('id','countBal', 'frameRate',   # select only needed columns, others are removed
-           'type':'shape', 'task':'block',
-           'correct_loc_left':'correct_shape_right',
+           'type':'shape', 'task', 'cue','cuefol', 'block',
+           'correct_loc_left':'correct_shape_right', 
            
            'nBlocksMixCb1.thisRepN':'nBlocksMixCb1.thisIndex',
            'nTrialsMixCb1.thisRepN':'nTrialsMixCb1.thisIndex',
@@ -84,80 +83,121 @@ p1 <- na_if(p0, "") %>% # replace blank spaces with NAs
 colnames(p1)
 table(p1$id) # check ids
   
-p1s <- p1 %>% # remove practice trials
+p2 <- p1 %>% # remove practice trials
   filter_at(vars(
-    # 'nBlocksMixCb1.thisRepN', 'nBlocksMixCb1.thisTrialN', 'nBlocksMixCb1.thisN', 'nBlocksMixCb1.thisIndex',
-    # 'nBlocksMixCb2.thisRepN', 'nBlocksMixCb2.thisTrialN', 'nBlocksMixCb2.thisN', 'nBlocksMixCb2.thisIndex',
-    # 'nBlocksMixCb3.thisRepN', 'nBlocksMixCb3.thisTrialN', 'nBlocksMixCb3.thisN', 'nBlocksMixCb3.thisIndex',
-    # 'nBlocksMixCb4.thisRepN', 'nBlocksMixCb4.thisTrialN', 'nBlocksMixCb4.thisN', 'nBlocksMixCb4.thisIndex',
-    
-    # 'nBlocksFreeCb1.thisRepN', 'nBlocksFreeCb1.thisTrialN', 'nBlocksFreeCb1.thisN', 'nBlocksFreeCb1.thisIndex',
-    # 'nBlocksFreeCb2.thisRepN', 'nBlocksFreeCb2.thisTrialN', 'nBlocksFreeCb2.thisN', 'nBlocksFreeCb2.thisIndex',
-    # 'nBlocksFreeCb3.thisRepN', 'nBlocksFreeCb3.thisTrialN', 'nBlocksFreeCb3.thisN', 'nBlocksFreeCb3.thisIndex',
-    # 'nBlocksFreeCb4.thisRepN', 'nBlocksFreeCb4.thisTrialN', 'nBlocksFreeCb4.thisN', 'nBlocksFreeCb4.thisIndex',
-    
     'both_shape_cb1_mix.corr', 'both_loc_cb1_mix.corr', 'both_shape_cb2_mix.corr', 'both_loc_cb2_mix.corr',
     'both_shape_cb3_mix.corr', 'both_loc_cb3_mix.corr', 'both_shape_cb4_mix.corr', 'both_loc_cb4_mix.corr',
-    
     'both_shape_cb1_free.corr', 'both_loc_cb1_free.corr', 'both_shape_cb2_free.corr', 'both_loc_cb2_free.corr',
     'both_shape_cb3_free.corr', 'both_loc_cb3_free.corr', 'both_shape_cb4_free.corr', 'both_loc_cb4_free.corr',
   ),
-  any_vars(!is.na(.))) # remove rows with NA in previously specified columns
+  any_vars(!is.na(.))) # remove rows with NAs (we infer which rows are practice based on presence of NAs in above-specified non-practice columns)
 
-
-p1s %>% 
+p2 %>% 
   group_by(id) %>% count()
 
-# p2 <- p1s %>% # fill in block number data based on values from specified columns
-#   group_by(id) %>% 
-#   fill(c('LoopCb1.thisRepN', 'LoopCb2.thisRepN'), .direction = "up") 
+p3 <- p2 %>% # just for pre-pilot run
+  mutate(block = ifelse(is.na(block), 'mixed', block))
 
-# p3 <- p1s %>%  # remove rows with no data in specified columns
-#   filter_at(vars('type','stimuli','location', 'shape'), all_vars(!is.na(.)))
+p4 <- p3 %>%  # collapse (unite) block number (so that it's coded in a single column, not split to separate columns based on cb)
+  rowwise() %>% 
+  mutate(blockNr = sum(c_across(c(
+    'nBlocksMixCb1.thisRepN', 'nBlocksMixCb2.thisRepN', 'nBlocksMixCb3.thisRepN', 'nBlocksMixCb4.thisRepN',
+    'nBlocksFreeCb1.thisRepN', 'nBlocksFreeCb2.thisRepN', 'nBlocksFreeCb3.thisRepN', 'nBlocksFreeCb4.thisRepN',
+  )), na.rm = T)) %>% 
+  relocate(blockNr, .after = 'block') # relocate for convenience
   
-
-p4 <- p3 %>%  # code/collapse block number (so that it's coded in a single column, not split to separate columns based on cb)
-  mutate(LoopCb1.thisRepN = as.numeric(LoopCb1.thisRepN),
-         LoopCb2.thisRepN = as.numeric(LoopCb2.thisRepN)) %>% 
-  mutate(blockNr = case_when(is.na(LoopCb1.thisRepN) ~ LoopCb2.thisRepN,
-                             is.na(LoopCb2.thisRepN) ~ LoopCb1.thisRepN,
-                             TRUE ~ NA_real_))
-
-p4 %>% group_by(id) %>% count() %>% print(n=Inf) # check nr of trials per id (63 trial x 4 blocks = 252)
+p4 %>% group_by(id) %>% count() %>% print(n=Inf) # check nr of trials per id
  
 p5 <- p4 %>% 
   select(-c('correct_loc_left':'correct_shape_right', 'stimuli')) # remove useless columns
 
-p6 <- p5 %>% # code/collapse data across tasks and cb's
-  mutate(task = case_when(is.na(both_loc_cb1.keys)   & is.na(both_loc_cb2.keys) ~ 'shape', # code task in a single column
-                          is.na(both_shape_cb1.keys) & is.na(both_shape_cb2.keys) ~ 'loc',
-                          TRUE ~  'unknownTask')) %>% 
-  mutate(resp = case_when(task == 'shape' & is.na(both_shape_cb1.keys) ~ both_shape_cb2.keys, # code response 
-                          task == 'shape' & is.na(both_shape_cb2.keys) ~ both_shape_cb1.keys,
-                          task == 'loc'   & is.na(both_loc_cb1.keys) ~ both_loc_cb2.keys,
-                          task == 'loc'   & is.na(both_loc_cb2.keys) ~ both_loc_cb1.keys,
-                          TRUE ~  'unknownResp')) %>% 
-  mutate(corr = case_when(task == 'shape' & is.na(both_shape_cb1.keys) ~ as.character(both_shape_cb2.corr), # code correct
-                          task == 'shape' & is.na(both_shape_cb2.keys) ~ as.character(both_shape_cb1.corr),
-                          task == 'loc'   & is.na(both_loc_cb1.keys) ~ as.character(both_loc_cb2.corr),
-                          task == 'loc'   & is.na(both_loc_cb2.keys) ~ as.character(both_loc_cb1.corr),
-                          TRUE ~  'unknownCorr')) %>% 
-  mutate(rt   = case_when(task == 'shape' & is.na(both_shape_cb1.keys) ~ as.numeric(both_shape_cb2.rt), # code rt
-                          task == 'shape' & is.na(both_shape_cb2.keys) ~ as.numeric(both_shape_cb1.rt),
-                          task == 'loc'   & is.na(both_loc_cb1.keys) ~ as.numeric(both_loc_cb2.rt),
-                          task == 'loc'   & is.na(both_loc_cb2.keys) ~ as.numeric(both_loc_cb1.rt),
-                          TRUE ~  NA_real_))
+p6 <- p5 %>% # get collapsed task per trial across tasks and cb's (actually performed and cued) - quite slow part of the code
+  bind_cols(p5 %>% 
+              select(starts_with('both_loc_') & ends_with('.keys')) %>%  # selects loc task across all cbs and free/mixed blocks
+              mutate(across(everything(), ~replace(., . == 'None', NA))) %>%  # replace 'None' with NAs (case_when works too but is slower)
+              mutate(task1 = case_when(if_all(everything(), is.na) ~ 'shape')) %>% 
+              bind_cols(p5 %>% # bind columns processed similarly as those above
+                          select(starts_with('both_shape_') & ends_with('.keys')) %>%   
+                          mutate(across(everything(), ~replace(., . == 'None', NA))) %>%   
+                          mutate(task2 = case_when(if_all(everything(), is.na) ~ 'loc')) %>% 
+                          select(task2)) %>% 
+              unite(task_perf, c(task1,task2), sep = "", na.rm = TRUE) %>% 
+              select(task_perf)) %>% 
+  mutate(task_cued = case_when(cue == 'JAKI' ~ 'shape', # actually just renamed 'cue' column
+                               cue == 'GDZIE'~ 'loc',
+                               cue == 'XXXX' ~ 'any',
+                               TRUE ~ 'unknownTask')) %>% 
+  relocate(c(task_cued, task_perf), .after = 'block') # relocate for convenience
 
-p7 <- p6 %>% # code task switch vs stay
-  mutate(switch_type = case_when(task == 'shape' & lag(task) == 'shape' ~ 'stay_shape', # code switch type in a single column
-                                 task == 'loc' & lag(task) == 'loc' ~ 'stay_loc',
-                                 task == 'shape' & lag(task) == 'loc' ~ 'switch_shape',
-                                 task == 'loc' & lag(task) == 'shape' ~ 'switch_loc',
-                                 TRUE ~ 'unknownSwitch')) %>%  
-  mutate(switch = case_when(switch_type == 'stay_shape' | switch_type == 'stay_loc' ~ 0, # code switch (logical)
+colnames(p6)
+
+p5a <- p5 %>%  # collapse (unite) all trial and block data across tasks and cb's
+  select(starts_with('nBlocks') & ends_with('.thisRepN')) %>% # block columns
+  unite('nBlocks.thisRepN', everything(), sep='', na.rm=T) %>% 
+  bind_cols(p5 %>% 
+              select(starts_with('nBlocks') & ends_with('.thisTrialN')) %>% 
+              unite('nBlocks.thisTrialN', everything(), sep='', na.rm=T)) %>% 
+  bind_cols(p5 %>% 
+              select(starts_with('nBlocks') & ends_with('.thisN')) %>% 
+              unite('nBlocks.thisN', everything(), sep='', na.rm=T)) %>% 
+  bind_cols(p5 %>% 
+              select(starts_with('nBlocks') & ends_with('.thisIndex')) %>% 
+              unite('nBlocks.thisIndex', everything(), sep='', na.rm=T)) %>% 
+  bind_cols(p5 %>% 
+              select(starts_with('nTrials') & ends_with('.thisRepN')) %>% # trial columns
+              unite('nTrials.thisRepN', everything(), sep='', na.rm=T) %>% 
+              bind_cols(p5 %>% 
+                          select(starts_with('nTrials') & ends_with('.thisTrialN')) %>% 
+                          unite('nTrials.thisTrialN', everything(), sep='', na.rm=T)) %>% 
+              bind_cols(p5 %>% 
+                          select(starts_with('nTrials') & ends_with('.thisN')) %>% 
+                          unite('nTrials.thisN', everything(), sep='', na.rm=T)) %>% 
+              bind_cols(p5 %>% 
+                          select(starts_with('nTrials') & ends_with('.thisIndex')) %>% 
+                          unite('nTrials.thisIndex', everything(), sep='', na.rm=T))) %>% 
+  mutate_if(is.character,as.integer)
+
+
+p5b <- p5 %>% # collapse response (keys) data
+  select(starts_with('both_') & ends_with('.keys')) %>% 
+  mutate(across(everything(), ~replace(., . == 'None', NA))) %>% 
+  unite(resp, everything(), sep='', na.rm=T) %>% 
+  bind_cols(p5 %>% # collapse rt data
+              select(starts_with('both_') & ends_with('.rt')) %>% 
+              unite(rt, everything(), sep='', na.rm=T) %>% 
+              mutate(rt = as.numeric(rt))) %>% 
+  bind_cols(p5 %>% # collapse accuracy (corr) data
+              select(starts_with('both_') & ends_with('.corr')) %>% 
+              mutate(across(everything(), ~replace(., . == '888', NA))) %>% 
+              unite(corr, everything(), sep='', na.rm=T) %>% 
+              mutate(corr = as.integer(corr)) )
+
+p7 <- p6 %>% 
+  select(id:blockNr) %>% # select remaining non-redundant columns 
+  bind_cols(p5a, p5b) %>%  # bind with collapsed trial, block, resp, rt and corr dataframes 
+  group_by(id, blockNr) %>% # grouping needed to code task switch type (to not consider block starts)
+  mutate(switch_type = case_when(task_perf == 'shape' & lag(task_perf) == 'shape' ~ 'stay_shape', # code task switch type
+                                 task_perf == 'loc' & lag(task_perf) == 'loc' ~ 'stay_loc',
+                                 task_perf == 'shape' & lag(task_perf) == 'loc' ~ 'switch_shape',
+                                 task_perf == 'loc' & lag(task_perf) == 'shape' ~ 'switch_loc')) %>%  
+  mutate(switch = case_when(switch_type == 'stay_shape' | switch_type == 'stay_loc' ~ 0, # code switch logical
                             switch_type == 'switch_shape' | switch_type == 'switch_loc' ~ 1,
                             TRUE ~ NA_real_)) %>% 
-  filter(corr != 999) # renove unknown corr
+  relocate(resp:switch, .after = blockNr) %>% 
+  ungroup()
+
+# Post-wrangling checks and descriptives
+
+colnames(p7)
+p7 %>% group_by(id) %>% count()
+p7 %>% group_by(id, block) %>% count() %>% pivot_wider(names_from = block, values_from = n)
+
+p7 %>% group_by(id) %>% get_summary_stats(rt)
+p7 %>% freq_table(resp)
+p7 %>% freq_table(corr)
+p7 %>% freq_table(task_perf)
+p7 %>% freq_table(task_cued)
+
 
 # Voluntary switch rates  ###########
 
@@ -209,7 +249,7 @@ ggplot(s4, aes(y = mean, x = difficulty)) + # plot VSR by difficulty
   scale_x_discrete(limits = rev, labels = c('Easy', 'Difficult')) +
   labs(y = 'VSR (%)', x = 'Difficulty of switch')
 
-ggsave('vsrDiff.png', path = 'plots_pilot_3/')
+ggsave('vsrDiff.png', path = 'plots_pilot_4/')
 
 
 # VSR by id, diff and block
@@ -246,7 +286,7 @@ ggplot(s6, aes(y = mean, x = blockNr, group = difficulty, colour = difficulty)) 
   scale_colour_discrete(limits = rev, labels = c('Easy', 'Difficult')) +
   labs(y = 'VSR (%)', x = 'Block number', colour = 'Difficulty of switch')
 
-ggsave('vsrDiffxBlock.png', path = 'plots_pilot_3/')
+ggsave('vsrDiffxBlock.png', path = 'plots_pilot_4/')
 
  
 # Switch vs stay (% of switches) ##########
@@ -265,7 +305,7 @@ ggplot(z1, aes(y = n, x = switch_type, fill = switch_type, colour = switch_type)
   geom_text(aes(label = n), nudge_y = 30) +
   theme(axis.text.x = element_text(angle = 60, vjust = 0.5))
 
-ggsave('switchTypexId.png', path = 'plots_pilot_3/', width = 12, height = 11)
+ggsave('switchTypexId.png', path = 'plots_pilot_4/', width = 12, height = 11)
 
 p7 %>% # overall proportion of switches
   filter(!is.na(switch)) %>% 
@@ -302,7 +342,7 @@ p7 %>% # plot proportion of switches per id
   scale_x_discrete(labels=c('stay', 'switch')) +
   labs(y = 'Proportion of stay/switch', x = 'Type')
   
-ggsave('switchPropxId.png', path = 'plots_pilot_3/', width = 9, height = 8)
+ggsave('switchPropxId.png', path = 'plots_pilot_4/', width = 9, height = 8)
 
 p7 %>% # plot proportion of switches (averaged across id's)
   filter(!is.na(switch)) %>% 
@@ -320,14 +360,14 @@ p7 %>% # plot proportion of switches (averaged across id's)
   scale_x_discrete(labels=c('stay', 'switch')) +
   labs(y = 'Proportion of stay/switch', x = 'Type')
 
-ggsave('switchProp.png', path = 'plots_pilot_3/', width = 5, height = 5)
+ggsave('switchProp.png', path = 'plots_pilot_4/', width = 5, height = 5)
 
 # Repetition bias #########
 z2 <- p7 %>% 
   filter(switch == 0) %>% 
-  group_by(task) %>% 
+  group_by(task_perf) %>% 
   count() %>% 
-  pivot_wider(names_from = 'task', values_from = 'n') %>% 
+  pivot_wider(names_from = 'task_perf', values_from = 'n') %>% 
   bind_cols(p7 %>% 
               filter(switch == 1) %>% 
               ungroup() %>%
@@ -347,26 +387,26 @@ ggplot(z2, aes(y=prop, x=type)) +
   geom_text(aes(label = round(prop,2)), nudge_y = 0.05) +
   theme(axis.text.x = element_text(angle = 30, vjust = 0.6))
 
-ggsave('repBias.png', path = 'plots_pilot_3/', width = 4, height = 4)
+ggsave('repBias.png', path = 'plots_pilot_4/', width = 4, height = 4)
 
   
   
 # Easy vs difficult decision (% of easy task selection) ##########
 
 p7 %>% # overall proportion of easy task selection
-  filter(task != 'unknownTask') %>% 
-  group_by(task) %>%
+  filter(task_perf != 'unknownTask') %>% 
+  group_by(task_perf) %>%
   count() %>% 
-  pivot_wider(names_from = 'task', values_from = 'n') %>% 
+  pivot_wider(names_from = 'task_perf', values_from = 'n') %>% 
   mutate(easy_prop = loc/(loc+shape),
          diff_prop = shape/(loc+shape))
 
 p7 %>% # plot by block and id
-  filter(task != 'unknownTask') %>% 
-  group_by(id, blockNr, task) %>%
-  # group_by(blockNr, task) %>%
+  filter(task_perf != 'unknownTask') %>% 
+  group_by(id, blockNr, task_perf) %>%
+  # group_by(blockNr, task_perf) %>%
   count() %>% 
-  pivot_wider(names_from = 'task', values_from = 'n') %>% 
+  pivot_wider(names_from = 'task_perf', values_from = 'n') %>% 
   mutate_if(is.numeric, ~replace_na(.,0)) %>%
   mutate(easy_sel = loc/(loc+shape)) %>% 
   ggplot(., aes(x = blockNr, y = easy_sel)) +
@@ -375,10 +415,10 @@ p7 %>% # plot by block and id
   labs(y = 'Selection of easy task (%)', x = 'Block')
 
 p7 %>% # plot by block only
-  filter(task != 'unknownTask') %>% 
-  group_by(blockNr, task) %>%
+  filter(task_perf != 'unknownTask') %>% 
+  group_by(blockNr, task_perf) %>%
   count() %>% 
-  pivot_wider(names_from = 'task', values_from = 'n') %>% 
+  pivot_wider(names_from = 'task_perf', values_from = 'n') %>% 
   mutate_if(is.numeric, ~replace_na(.,0)) %>%
   mutate(easy_sel = loc/(loc+shape)) %>% 
   ggplot(., aes(x = blockNr, y = easy_sel)) +
@@ -387,25 +427,25 @@ p7 %>% # plot by block only
   scale_y_continuous(limits = c(0,1)) +
   labs(y = 'Selection of easy task (%)', x = 'Block')
 
-ggsave('easySelxBlock.png', path = 'plots_pilot_3/')
+ggsave('easySelxBlock.png', path = 'plots_pilot_4/')
 
 p7 %>% # plot averaged
-  filter(task != 'unknownTask') %>% 
-  group_by(task) %>%
+  filter(task_perf != 'unknownTask') %>% 
+  group_by(task_perf) %>%
   count() %>% 
-  pivot_wider(names_from = 'task', values_from = 'n') %>% 
+  pivot_wider(names_from = 'task_perf', values_from = 'n') %>% 
   mutate_if(is.numeric, ~replace_na(.,0)) %>%
   mutate(easy_sel = loc/(loc+shape),
          diff_sel = shape/(loc+shape)) %>% 
-  pivot_longer(cols = c('easy_sel', 'diff_sel'), names_to = 'task', values_to = 'sel') %>% 
-  ggplot(., aes(x = task, y = sel)) +
+  pivot_longer(cols = c('easy_sel', 'diff_sel'), names_to = 'task_perf', values_to = 'sel') %>% 
+  ggplot(., aes(x = task_perf, y = sel)) +
   geom_point(size = 3) +
   geom_text(aes(label = round(sel,3)), nudge_y = 0.04) +
   scale_y_continuous(limits = c(0,1)) +
   scale_x_discrete(labels=c('Difficult', 'Easy')) +
   labs(y = 'Proportion (%)', x = 'Task')
 
-ggsave('taskSel.png', path = 'plots_pilot_3/', width = 5, height = 5)
+ggsave('taskSel.png', path = 'plots_pilot_4/', width = 5, height = 5)
 
 
 # Stiffness ########
@@ -416,26 +456,26 @@ p8 <- p7 %>%
   mutate(sumSwitch = cumsum(as.double(switch)))
 
 x2 <- p8 %>% 
-  group_by(id, blockNr, sumSwitch, task) %>% 
+  group_by(id, blockNr, sumSwitch, task_perf) %>% 
   count()
 
 x2 %>% 
-  ungroup() %>% group_by(task) %>% 
+  ungroup() %>% group_by(task_perf) %>% 
   get_summary_stats(n) %>% 
-  select(task, n, mean, se) %>% 
-  ggplot(., aes(y = mean, x= task)) +
+  select(task_perf, n, mean, se) %>% 
+  ggplot(., aes(y = mean, x= task_perf)) +
   geom_point(size=3) +
   geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1) +
   scale_x_discrete(labels = c('Easy', 'Difficult')) +
   labs(y = 'Average single task run (nr of trials)', x = 'Task') 
  
-ggsave('runLengthxDiff.png', path = 'plots_pilot_3/', width = 5, height = 5)
+ggsave('runLengthxDiff.png', path = 'plots_pilot_4/', width = 5, height = 5)
 
 x2 %>% 
-  ungroup() %>% group_by(id, task) %>% 
+  ungroup() %>% group_by(id, task_perf) %>% 
   get_summary_stats(n) %>% 
-  select(id, task, n, mean, se) %>% 
-  ggplot(., aes(y = mean, x= task)) +
+  select(id, task_perf, n, mean, se) %>% 
+  ggplot(., aes(y = mean, x= task_perf)) +
   geom_point(size=3) +
   geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1) +
   facet_wrap(~id) +
@@ -459,16 +499,16 @@ p7 %>% # stay vs switch
   get_summary_stats(acc)
 
 p7 %>% # easy vs difficult task
-  group_by(id, task) %>% 
-  filter(task != 'unknownTask') %>%
+  group_by(id, task_perf) %>% 
+  filter(task_perf != 'unknownTask') %>%
   mutate(corr = as.integer(corr)) %>% 
   summarise(sumCorr = sum(corr, na.rm = T)) %>% 
   left_join(p7 %>% 
-              group_by(id, task) %>% 
-              filter(task != 'unknownTask') %>% 
+              group_by(id, task_perf) %>% 
+              filter(task_perf != 'unknownTask') %>% 
               count()) %>% 
   mutate(acc = sumCorr/n) %>% 
-  group_by(task) %>% 
+  group_by(task_perf) %>% 
   get_summary_stats(acc)
 
 p7 %>% # plot switch type, averaged across ids
@@ -490,7 +530,7 @@ p7 %>% # plot switch type, averaged across ids
   theme(axis.text.x = element_text(angle = 30, vjust = 0.6)) +
   labs(y = 'Accuracy (%)', x = 'Trial type')
 
-ggsave('accuracy.png', path = 'plots_pilot_3/', width = 5, height = 5)
+ggsave('accuracy.png', path = 'plots_pilot_4/', width = 5, height = 5)
 
 p7 %>% # plot switch type, per id
   group_by(id, switch_type) %>% 
@@ -524,10 +564,10 @@ p7 %>%
   theme(axis.text.x = element_text(angle = 30, vjust = 0.6)) +
   labs(y = 'RT (s)', x = 'Trial type') 
 
-ggsave('rt.png', path = 'plots_pilot_3/', width = 5, height = 5)
+ggsave('rt.png', path = 'plots_pilot_4/', width = 5, height = 5)
 
 
-# Checks ###########
+# Checks ########### %>% 
 
 # check for NAs in all columns
 p5 %>% 
