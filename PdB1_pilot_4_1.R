@@ -98,16 +98,17 @@ p2 %>%
 p3 <- p2 # just a palce-holder
 
 p4 <- p3 %>%  # collapse (unite) block number (so that it's coded in a single column, not split to separate columns based on cb)
-  rowwise() %>% 
-  mutate(blockNr = sum(c_across(c(
-    'nBlocksMixCb1.thisRepN', 'nBlocksMixCb2.thisRepN', 'nBlocksMixCb3.thisRepN', 'nBlocksMixCb4.thisRepN',
-    'nBlocksFreeCb1.thisRepN', 'nBlocksFreeCb2.thisRepN', 'nBlocksFreeCb3.thisRepN', 'nBlocksFreeCb4.thisRepN',
-  )), na.rm = F)) %>% 
-  relocate(blockNr, .after = 'block') # relocate for convenience
+  bind_cols(p3 %>% 
+              select(starts_with('nBlocks') & ends_with('.thisRepN')) %>% 
+              unite('blockNr', everything(), sep='', na.rm=T) %>% 
+              mutate(blockNr = as.integer(blockNr)) %>% 
+              fill(blockNr, .direction = "up")) %>% 
+  relocate(blockNr, .after = block)  # relocate for convenience
   
 p4 %>% group_by(id) %>% count() %>% print(n=Inf) # check nr of trials per id
 p4 %>% group_by(id) %>% count(blockNr)  %>% print(n=Inf)
- 
+
+  
 p5 <- p4 %>% 
   select(-c('correct_loc_left':'correct_shape_right', 'stimuli')) # remove useless columns
 
