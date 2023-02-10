@@ -17,6 +17,10 @@
   Sys.setenv(LANG = "en")
   theme_set(theme_bw(base_size = 14) +
               theme(panel.grid.minor = element_blank()))
+  
+  library(default)
+  default(get_summary_stats) <- list(type = 'common') # get_summary_stats <- reset_default(get_summary_stats)
+  
 }
 
 # Data wrangling ###########
@@ -95,20 +99,20 @@ p2 <- p1 %>% # remove practice trials
 p2 %>% 
   group_by(id) %>% count()
 
-p3 <- p2 # just a palce-holder
-
-p4 <- p3 %>%  # collapse (unite) block number (so that it's coded in a single column, not split to separate columns based on cb)
-  bind_cols(p3 %>% 
+p3 <- p2  %>%  # collapse (unite) block number (so that it's coded in a single column, not split to separate columns based on cb)
+  bind_cols(p2 %>% 
               select(starts_with('nBlocks') & ends_with('.thisRepN')) %>% 
-              unite('blockNr', everything(), sep='', na.rm=T) %>% 
-              mutate(blockNr = as.integer(blockNr)) %>% 
-              fill(blockNr, .direction = "up")) %>% 
+              unite('blockNr', everything(), sep='', na.rm=T) %>% # unite columns
+              mutate(blockNr = as.integer(blockNr) + 1) %>% 
+              fill(blockNr, .direction = "up")) %>% # fill-up block nr from row in which it was specified to all other rows (trials)
   relocate(blockNr, .after = block)  # relocate for convenience
   
-p4 %>% group_by(id) %>% count() %>% print(n=Inf) # check nr of trials per id
-p4 %>% group_by(id) %>% count(blockNr)  %>% print(n=Inf)
+p3 %>% group_by(id) %>% count() %>% print(n=Inf) # check nr of trials per id
+p3 %>% group_by(id) %>% count(blockNr)  %>% print(n=Inf)
 
-  
+p4 <- p3 %>% 
+  filter_at(vars('type':'block'), any_vars(!is.na(.))) # remove remaining rows with NAs (already used to fill-up block nr)
+
 p5 <- p4 %>% 
   select(-c('correct_loc_left':'correct_shape_right', 'stimuli')) # remove useless columns
 
@@ -129,8 +133,6 @@ p6 <- p5 %>% # get collapsed task per trial across tasks and cb's (actually perf
                                cue == 'XXXX' ~ 'any',
                                TRUE ~ 'unknownTask')) %>% 
   relocate(c(task_cued, task_perf), .after = 'block') # relocate for convenience
-
-colnames(p6)
 
 p5a <- p5 %>%  # collapse (unite) all trial and block data across tasks and cb's
   select(starts_with('nBlocks') & ends_with('.thisRepN')) %>% # block columns
@@ -158,7 +160,6 @@ p5a <- p5 %>%  # collapse (unite) all trial and block data across tasks and cb's
                           unite('nTrials.thisIndex', everything(), sep='', na.rm=T))) %>% 
   mutate_if(is.character,as.integer)
 
-
 p5b <- p5 %>% # collapse response (keys) data
   select(starts_with('both_') & ends_with('.keys')) %>% 
   mutate(across(everything(), ~replace(., . == 'None', NA))) %>% 
@@ -173,6 +174,8 @@ p5b <- p5 %>% # collapse response (keys) data
               unite(corr, everything(), sep='', na.rm=T) %>% 
               mutate(corr = as.integer(corr)) )
 
+nrow(p6) == nrow(p5a) && nrow(p6) == nrow(p5b) # before merging make sure nr or rows is identical
+
 p7 <- p6 %>% 
   select(id:blockNr) %>% # select remaining non-redundant columns 
   bind_cols(p5a, p5b) %>%  # bind with collapsed trial, block, resp, rt and corr dataframes 
@@ -185,20 +188,30 @@ p7 <- p6 %>%
                             switch_type == 'switch_shape' | switch_type == 'switch_loc' ~ 1,
                             TRUE ~ NA_real_)) %>% 
   relocate(resp:switch, .after = blockNr) %>% 
-  ungroup()
+  relocate(cuefol, .after = task_perf) %>% 
+  ungroup() %>% 
+  filter(corr < 999) %>% # remove unknown corr
+  mutate(trialNr = nTrials.thisN + 1, .after = blockNr) %>% # recode trial nr per block
+  select(-c('cue', 'nBlocks.thisRepN':'nTrials.thisIndex')) %>% # again remove some columns
+  rename(trial_type = task)
 
 # Post-wrangling checks and descriptives
 
 colnames(p7)
+p7 %>% distinct(frameRate, .keep_all = TRUE) %>% select(id, frameRate) %>% arrange(frameRate) %>% 
+  ggplot(., aes(x=frameRate)) + geom_histogram() 
+
 p7 %>% group_by(id) %>% count()
 p7 %>% group_by(id, block) %>% count() %>% pivot_wider(names_from = block, values_from = n)
 
 p7 %>% group_by(id) %>% count(blockNr)
+p7 %>% count(block)
 
-p7 %>% group_by(id) %>% get_sup7 %>% group_by(id) %>% get_sup7 %>% group_by(id) %>% get_summary_stats(rt)
+p7 %>% group_by(id) %>% group_by(id) %>% group_by(id) %>% get_summary_stats(rt)
 p7 %>% freq_table(resp)
 p7 %>% freq_table(corr)
 p7 %>% freq_table(task_perf)
+p7 %>% freq_table(block, task_perf)
 p7 %>% freq_table(task_cued)
 
 # Break times ######
@@ -218,91 +231,98 @@ ggplot(b1, aes(x=timeBreak)) + geom_histogram(binwidth = 1)
 # Voluntary switch rates  ###########
 
 s1 <- p7 %>% 
-  group_by(id, blockNr) %>% 
+  group_by(id, block) %>% 
+  filter(trial_type == 'free') %>% # discard forced trials
   filter(!is.na(switch)) %>%
   summarise(switch_sum = sum(switch)) %>% # get nr of all switches per id and block 
   left_join(p7 %>% # join/merge with another df in which we get nr of all observations
-              group_by(id, blockNr) %>% 
+              group_by(id, block) %>% 
+              filter(trial_type == 'free') %>% # discard forced trials
               count(switch_data = !is.na(switch)) %>% # get nr of all non-NA observations about switch (both switch & stay)
               filter(switch_data == TRUE) %>% 
               select(-switch_data)) %>% 
   mutate(vsr = round(switch_sum/n, 3)) # get VSR (nr of switches / nr of observations) 
 
+s1 %>% 
+  group_by(block) %>% 
+  get_summary_stats(vsr) %>% 
+  ggplot(., aes(y = mean, x = block)) +
+  geom_point(size=5) +
+  geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1) +
+  labs(y = 'VSR')
 
 
-s2 <- s1 %>%  # add VSR based on switch difficulty, per id and block
+s2 <- s1 %>%  # add VSR based on switch difficulty, per id 
   left_join(p7 %>% 
-              group_by(id, blockNr) %>% 
+              group_by(id, block) %>% 
+              filter(trial_type == 'free') %>% # discard forced trials
               filter(switch_type == 'switch_shape') %>% 
               count(name = 'switch_diff') %>% # count difficult switches (location -> shape)
               left_join(p7 %>% 
-                          group_by(id, blockNr) %>% 
+                          group_by(id, block) %>%  
+                          filter(trial_type == 'free') %>%
                           filter(switch_type == 'switch_loc') %>% 
                           count(name = 'switch_easy'))) %>%  # count easy switches (shape -> location)
   relocate(c('switch_easy', 'switch_diff'), .before = 'n') %>% # rearrange for convenience
   mutate(vsr_easy = switch_easy/n, # get VSR for easy and diff switches
-         vsr_diff = switch_diff/n)
+         vsr_diff = switch_diff/n) %>% 
+  replace(is.na(.), 0)
+
+s2 %>% 
+  group_by(block) %>% 
+  get_summary_stats(vsr_easy, vsr_diff) %>% 
+  ggplot(., aes(y = mean, x = block, fill = variable, colour = variable)) +
+  geom_point(position = position_dodge(0.1)) +
+  geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1, position = position_dodge(0.1)) +
+  geom_text(aes(label = round(mean,3)), nudge_y = 0.001, nudge_x = 0.15, show.legend = FALSE) +
+  labs(y = 'VSR', colour = 'VSR type') + guides(fill="none")
+
+s2 %>% ungroup() %>% # check if VSR can be dissociated in freeOnly and mixed block
+  group_by(block) %>% 
+  mutate(switch_difference = switch_easy - switch_diff, .before = 'n') %>% 
+  get_summary_stats(switch_difference)
 
 s3 <- s2 %>% 
   left_join(s2 %>% # add VSR per id only (averaged across blocks)
               ungroup() %>% 
               group_by(id) %>% 
-              summarise(vsr_id = mean(vsr),
-                        vsr_easy_id = mean(vsr_easy),
-                        vsr_diff_id = mean(vsr_diff))) 
+              summarise(vsr_avg = mean(vsr),
+                        vsr_easy_avg = mean(vsr_easy),
+                        vsr_diff_avg = mean(vsr_diff))) %>% 
+  mutate(block = as.factor(block))
 
-# VSR by diff only
+# VSR by diff and block
 s4 <- s3 %>% # reshape and summarise for plot 1
   pivot_longer(cols = c('vsr_easy', 'vsr_diff'), names_prefix = 'vsr_', names_to = 'difficulty', # reshape (to long format)
                values_to = 'vsr_difficulty') %>% 
-  group_by(difficulty) %>% 
+  group_by(block, difficulty) %>% 
   get_summary_stats(vsr_difficulty) %>% # summarise
   mutate(difficulty = as.factor(difficulty))
 
-ggplot(s4, aes(y = mean, x = difficulty)) + # plot VSR by difficulty
-  geom_point(size = 5) +
-  geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1) +
-  scale_x_discrete(limits = rev, labels = c('Easy', 'Difficult')) +
-  labs(y = 'VSR (%)', x = 'Difficulty of switch')
+ggplot(s4, aes(y = mean, x = block, colour = difficulty, group = difficulty)) + # plot VSR by difficulty
+  geom_point(size = 5, position = position_dodge(0.3)) +
+  geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1, position = position_dodge(0.3)) +
+  geom_text(aes(label = round(mean,3)), show.legend = FALSE, position = position_dodge(1)) +
+  labs(y = 'VSR (%)', x = 'Block', colour = 'Difficulty of switch')
 
-ggsave('vsrDiff.png', path = 'plots_pilot_4/')
+ggsave('vsr_blockXdiff.png', path = 'plots_pilot_4/', w=7,h=6)
 
 
 # VSR by id, diff and block
 s5 <- s3 %>% # reshape and summarise for plot 2
   pivot_longer(cols = c('vsr_easy', 'vsr_diff'), names_prefix = 'vsr_', names_to = 'difficulty', # reshape (to long format)
                values_to = 'vsr_difficulty') %>% 
-  group_by(id, blockNr, difficulty) %>% 
-  get_summary_stats(vsr_difficulty) %>% # summarise
-  mutate(blockNr = as.factor(blockNr))
+  mutate(difficulty = as.factor(difficulty)) %>% 
+  relocate(difficulty, .after = block)
 
-ggplot(s5, aes(y = mean, x = blockNr, group = difficulty, colour = difficulty)) + # plot VSR across blocks
+ggplot(s5, aes(y = vsr_difficulty, x = block, group = difficulty, colour = difficulty)) + # plot VSR across blocks
   geom_point(size = 5, position = position_dodge(0.1)) +
-  geom_line(position = position_dodge(0.1)) +
-  geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1, position = position_dodge(0.1)) +
   facet_wrap(~id, labeller = labeller(id = label_both)) +
-  # scale_y_continuous(limits = c(0,1)) +
+  geom_text(aes(label = round(vsr_difficulty,2)), show.legend = FALSE, position = position_dodge(1.5), size=4) +
   scale_colour_discrete(limits = rev, labels = c('Easy', 'Difficult')) +
   labs(y = 'VSR (%)', x = 'Block number', colour = 'Difficulty of switch')
 
-# VSR by diff and block
-s6 <- s3 %>% # reshape and summarise for plot 3
-  pivot_longer(cols = c('vsr_easy', 'vsr_diff'), names_prefix = 'vsr_', names_to = 'difficulty', # reshape (to long format)
-               values_to = 'vsr_difficulty') %>% 
-  group_by(blockNr, difficulty) %>% 
-  get_summary_stats(vsr_difficulty) %>% # summarise
-  mutate(blockNr = as.factor(blockNr),
-         difficulty = as.factor(difficulty))
-
-ggplot(s6, aes(y = mean, x = blockNr, group = difficulty, colour = difficulty)) + # plot VSR across blocks
-  geom_point(size = 5, position = position_dodge(0.1)) +
-  geom_line(position = position_dodge(0.1)) +
-  geom_errorbar(aes(ymin = mean-2*se, ymax = mean+2*se), width = 0.1, position = position_dodge(0.1)) +
-  # scale_y_continuous(limits = c(0,1)) +
-  scale_colour_discrete(limits = rev, labels = c('Easy', 'Difficult')) +
-  labs(y = 'VSR (%)', x = 'Block number', colour = 'Difficulty of switch')
-
-ggsave('vsrDiffxBlock.png', path = 'plots_pilot_4/')
+ggsave('vsr_blockXdiffXid.png', path = 'plots_pilot_4/', w=13,h=10)
 
  
 # Switch vs stay (% of switches) ##########
