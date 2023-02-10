@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # PdB1 VTS pilot experiment analysis ###########
 # Bartosz Majchrowicz, majchrowicz.b@gmail.com #
 

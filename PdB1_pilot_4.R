@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # PdB1 VTS pilot experiment analysis ###########
 # Bartosz Majchrowicz, majchrowicz.b@gmail.com #
 
@@ -1180,5 +1179,3 @@ s2 %>%
   mutate(checkVsr = case_when(round(vsr, 3) == round(vsr_easy + vsr_diff, 3) ~ 1, # should be 1 (unless NA)
                               TRUE ~ 0)) %>% 
   print(n=Inf)
-
->>>>>>> aab1b3b6b8abf98a45e2eb76c614ebc267aeb672
